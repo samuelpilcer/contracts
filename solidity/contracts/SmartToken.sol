@@ -105,6 +105,29 @@ contract SmartToken is ISmartToken, Owned, ERC20Token, TokenHolder {
         return true;
     }
 
+    function delegatedTransfer(uint256 _nonce, address _from, address _to, uint256 _value, uint256 _fee, uint8 _v, bytes32 _r, bytes32 _s) public returns (bool) {
+
+        uint256 total = _value.add(_fee);
+        require(_from != address(0));
+        require(_to != address(0));
+        require(total <= balances[_from]);
+        require(_nonce > nonces[_from]);
+
+        address delegate = msg.sender;
+        address token = address(this);
+        bytes32 delegatedTxnHash = keccak256(delegate, token, _nonce, _from, _to, _value, _fee);
+        address signatory = ecrecover(delegatedTxnHash, _v, _r, _s);
+        require(signatory == _from);
+
+        balances[_from] = balances[_from].sub(total);
+        balances[_to] = balances[_to].add(_value);
+        balances[delegate] = balances[delegate].add(_fee);
+        nonces[_from] = _nonce;
+
+        DelegatedTransfer(_from, _to, delegate, value, fee);
+        return true;
+    }
+
     /**
         @dev an account/contract attempts to get the coins
         throws on any error rather then return a false flag to minimize user errors
